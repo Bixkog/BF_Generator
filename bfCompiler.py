@@ -19,7 +19,7 @@ def bfEvaluate(code, input_list, bracemap):
 
     code_ptr = cell_ptr = input_ptr = 0
 
-    cells_num = 30000
+    cells_num = 3000
     cells = [0] * cells_num
 
     while code_ptr < len(code):
