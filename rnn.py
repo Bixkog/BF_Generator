@@ -97,14 +97,17 @@ def pred(sample):
 
 
 def evaluate(model, predict_len=100, variance=0.01):
-"""
+    """
     Evaluate given model
     Args:
         model(nn.Module): given neural net model
         predict_len(int): length of programs to generate
         variance(float): a variance for initialization of LSTM's hidden state,
             which values are taken from N(0, variance)
-"""
+    Returns:
+        progs([string]): list of generated programs of shape (batch_size, predict_len)
+        probs([float]): list of products of probabilities of every token from a generated program for each index 
+    """
     input_token = "START"
     input_token = token_to_tensor(input_token)
     model.init_hidden_normal(variance=0.5)
