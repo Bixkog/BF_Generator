@@ -2,6 +2,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
 
 token = {
     '.' : 0, 
@@ -15,6 +19,8 @@ token = {
     "START" : 8
     }
 
+token_num = len(token.keys())
+
 char = {
     0 : '.',
     1 : ',', 
@@ -27,15 +33,23 @@ char = {
     # no START on purpose
     }
 
-embedding_size = 10
-hidden_size = 35
-output_size = len(char.keys())
-n_layers = 2
-batch_size = 16
-token_num = len(token.keys())
+def token_to_tensor(input_token):
+    tensor = torch.zeros(1, token_num).long()
+    tensor[0][token[input_token]] = 1
+    return tensor
+
+def pred(sample):
+    return np.argsort(sample)[-1]
+
 
 class BFgen(nn.Module):
-    def __init__(self, input_size, embedding_dim, hidden_size, output_size, n_layers=2, batch_size=1):
+    def __init__(self, input_size, 
+                       embedding_dim, 
+                       hidden_size,
+                       output_size, 
+                       n_layers=2, 
+                       batch_size=1,
+                       GAMMA=0.99):
         super(BFgen, self).__init__()
         self.input_size = input_size
         self.embedding_dim = embedding_dim
@@ -43,12 +57,17 @@ class BFgen(nn.Module):
         self.output_size = output_size
         self.n_layers = n_layers
         self.batch_size = batch_size
+        self.GAMMA = GAMMA
         
         self.encoder = nn.Embedding(input_size, embedding_dim)
         self.lstm = nn.LSTM(embedding_dim, hidden_size, n_layers)
         self.decoder = nn.Linear(hidden_size, output_size)
         self.softmax = nn.functional.softmax
         
+        self.baseline = 0.
+        
+        self.pqt_programs = np.array([])
+        self.pqt_rewards = np.array([])
 
     """
     forward
@@ -63,73 +82,47 @@ class BFgen(nn.Module):
         return probs
     
     def init_hidden_zero(self):
-        """
-        Initializes hidden state and cell state for LSTM as zeros
-        """
         self.hidden = (Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size)),
                       Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size)),)
     
     def init_hidden_normal(self, variance=0.01):
-        """
-        Initialzes hidden state and cell state for LSTM with values from Normal Distribution ~ N(0, variance)
-        """
         means = torch.zeros(self.n_layers, self.batch_size, self.hidden_size)
         std = torch.Tensor([variance]*self.hidden_size*self.n_layers*self.batch_size).unsqueeze(0)
         self.hidden = (Variable(torch.normal(means, std)), Variable(torch.normal(means, std)))
 
-def token_to_tensor(input_token):
-    """
-    Takes one of BF language tokens, returns its one-hot vector as torch.LongTensor
-    Args:
-        input_token(string): BF language token
-    Returns:
-        tensor(torch.LongTensor): token's one-hot vector 
-    """
-    tensor = torch.zeros(1, token_num).long()
-    tensor[0][token[input_token]] = 1
-    return tensor
-
-def pred(sample):
-    """
-    Takes np.array with probabilites, returns the highest probability
-    """
-    return np.argsort(sample)[-1]
+    def save_best(self, rewards, programs):
+        self.pqt_programs = np.append(self.pqt_programs, programs)
+        self.pqt_rewards = np.append(self.pqt_rewards, rewards)
+        args = np.argsort(self.pqt_rewards)
+        self.pqt_programs = self.pqt_programs[args][-10:]
+        self.pqt_rewards = self.pqt_rewards[args][-10:] # K
 
 
 def evaluate(model, predict_len=100, variance=0.01):
-    """
-    Evaluate given model
-    Args:
-        model(nn.Module): given neural net model
-        predict_len(int): length of programs to generate
-        variance(float): a variance for initialization of LSTM's hidden state,
-            which values are taken from N(0, variance)
-    Returns:
-        progs([string]): list of generated programs of shape (batch_size, predict_len)
-        probs([float]): list of products of probabilities of every token from a generated program for each index 
-    """
     input_token = "START"
     input_token = token_to_tensor(input_token)
     model.init_hidden_normal(variance=0.5)
-    prediction = [""] * batch_size
-    program_probs = np.ones((1, batch_size))
+    prediction = [""] * model.batch_size
+    program_probs = np.ones((1, model.batch_size))
     
-    batched_input = torch.zeros((batch_size, token_num)).long()
+    batched_input = torch.zeros((model.batch_size, token_num)).long()
     batched_input = batched_input + input_token
-    batched_input = Variable(batched_input.view(token_num, batch_size))
+    batched_input = Variable(batched_input.view(token_num, model.batch_size))
     
     for i in range(predict_len):
         output_probs = model.forward(batched_input)
-        next_tokens = np.apply_along_axis(pred, axis = 1, arr=output_probs.data.numpy())
-        top_probs = output_probs[np.arange(batch_size), next_tokens]
-        
-        batched_input = torch.zeros((batch_size, token_num)).long()
-        batched_input[np.arange(batch_size), next_tokens] = 1
-        batched_input = Variable(batched_input.view(token_num, batch_size))
+        top_probs, next_tokens = torch.max(output_probs, 1)
+        next_tokens = next_tokens.data.numpy()
+            
+
+        batched_input = torch.zeros((model.batch_size, token_num)).long()
+        batched_input[np.arange(model.batch_size), next_tokens] = 1
+        batched_input = Variable(batched_input.view(token_num, model.batch_size))
         
         program_probs *= top_probs.data.numpy()
         
-        for i in xrange(batch_size):
+        #prediction = map("".join,zip(prediction, char[]))
+        for i in xrange(model.batch_size):
             prediction[i] += char[next_tokens[i]]
         
     return prediction, program_probs
