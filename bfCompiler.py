@@ -16,7 +16,7 @@ def buildbracemap(code):
 
 
 def bfEvaluate(code, input_list, bracemap):
-
+    output = ''
     code_ptr = cell_ptr = input_ptr = 0
 
     cells_num = 3000
@@ -45,21 +45,26 @@ def bfEvaluate(code, input_list, bracemap):
             code_ptr = bracemap[code_ptr]
 
         if command == ".":
-            print(chr(cells[cell_ptr]))
+            output += chr(cells[cell_ptr])
         if command == ",":
             cells[cell_ptr] = ord(input_list[input_ptr])
             input_ptr += 1
 
         code_ptr += 1
 
+    return output
 
 def BF(code, input_list=''):
     '''
         compiler of BF code
-        input:
+        Args:
             code (string): BF code
             input_list (string): input assigned to code (if needed)
+        Returns:
+            string with output for given code
     '''
     code = parse(code)
     bracemap = buildbracemap(code)
-    bfEvaluate(code, input_list, bracemap)
+    output = bfEvaluate(code, input_list, bracemap)
+    return output
+  
