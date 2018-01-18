@@ -1,27 +1,36 @@
 def parse(code):
-    return filter(lambda x: x in ['.', ',', '[', ']', '<', '>', '+', '-'], code)
+    code = filter(lambda x: x in ['.', ',', '[', ']', '<', '>', '+', '-'], code)
+    open_braces = 0
+    unmatched_braces = 0
+    open_braces_pos = []
+    for position, char in enumerate(code):
+        if char == "[":
+            open_braces += 1
+            open_braces_pos.append(position)
+        if char == "]":
+            if open_braces:
+                open_braces -= 1
+                open_braces_pos.pop()
+            else:
+                unmatched_braces += 1
+                code = code[:position] + "N" + code[position + 1:]
+    unmatched_braces += len(open_braces_pos)
+    for i in xrange(len(open_braces_pos)):
+        code = code[:(position - i)] + code[(position - i + 1):]
+    code = code.replace("N", "")
+    return code, unmatched_braces
 
 
 def buildbracemap(code):
     bracestack, bracemap = [], {}
-    unmatched_braces, unmatched_braces_pos = 0, []
     for position, command in enumerate(code):
         if command == "[":
             bracestack.append(position)
         if command == "]":
-            if bracestack == []:
-                unmatched_braces += 1
-                unmatched_braces_pos.append(position)
-            else:
-                start = bracestack.pop()
-                bracemap[start] = position
-                bracemap[position] = start
-    unmatched_braces += len(bracestack)
-    unmatched_braces_pos += bracestack
-    for i in xrange(len(unmatched_braces_pos)):
-        position = unmatched_braces_pos[i]
-        code = code[:(position - i)] + code[(position - i + 1):]
-    return code, bracemap, unmatched_braces
+            start = bracestack.pop()
+            bracemap[start] = position
+            bracemap[position] = start
+    return bracemap
 
 
 def bfEvaluate(code, input_list, bracemap, ops_limit, max_ops):
@@ -81,8 +90,8 @@ def BF(code, input_list='', ops_limit=False, max_ops=5000):
             opertations_counter: number of program operations
             unmatched_braces: number of unmatched braces (used in strict mode)
     '''
-    code = parse(code)
-    code, bracemap, unmatched_braces = buildbracemap(code)
+    code, unmatched_braces = parse(code)
+    bracemap = buildbracemap(code)
     output, operations_counter = bfEvaluate(
         code, input_list, bracemap, ops_limit, max_ops)
     return output, operations_counter, unmatched_braces
