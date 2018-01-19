@@ -52,8 +52,8 @@ class BFgen(nn.Module):
                        GAMMA=0.99,
                        PG_learning_rate=1e-5,       # .\(ER) from paper
                        PQT_loss_multipiler=1.0,     # .\(TOPK) from paper
-                       entropy_regularizer=0.01     # .\(ENT) from paper
-                       ):
+                       entropy_regularizer=0.01,     # .\(ENT) from paper
+                       K = 10):
         super(BFgen, self).__init__()
         self.input_size = input_size
         self.embedding_dim = embedding_dim
@@ -65,6 +65,7 @@ class BFgen(nn.Module):
         self.PG_learning_rate = PG_learning_rate
         self.PQT_loss_multipiler = PQT_loss_multipiler
         self.entropy_regularizer = entropy_regularizer
+        self.K = 10
         
         self.encoder = nn.Embedding(input_size, embedding_dim)
         self.lstm = nn.LSTM(embedding_dim, hidden_size, n_layers)
@@ -102,8 +103,8 @@ class BFgen(nn.Module):
         self.pqt_programs = np.append(self.pqt_programs, programs)
         self.pqt_rewards = np.append(self.pqt_rewards, rewards)
         args = np.argsort(self.pqt_rewards)
-        self.pqt_programs = self.pqt_programs[args][-10:]
-        self.pqt_rewards = self.pqt_rewards[args][-10:] # K
+        self.pqt_programs = self.pqt_programs[args][-self.K:]
+        self.pqt_rewards = self.pqt_rewards[args][-self.K:] # K
 
 
 def evaluate(model, predict_len=100, variance=0.01):

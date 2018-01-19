@@ -83,8 +83,13 @@ def objective_PQT(model):
     inputs = np.vectorize(rnn.program_to_input)(model.pqt_programs)
     inputs = torch.stack(np.vectorize(rnn.program_to_tensor)(inputs), dim=1)
     inputs = Variable(inputs) # 100 x 10
+    outputs = torch.stack(np.vectorize(rnn.program_to_tensor)(model.pqt_programs), dim=0)
+    outputs = Variable(outputs) # 10 x 100
 
     probs = model.forward(inputs) # 8 x 100 x 10
+    probs = probs.permute(2, 1, 0) # 10 x 100 x 8
+    probs = torch.gather(probs, 2, outputs.unsqueeze(2)).squeeze(2)
 
-    
-    return probs
+    objective = torch.log(probs.prod(dim=1) + 0.00000001).sum()
+
+    return objective
