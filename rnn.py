@@ -72,7 +72,8 @@ class BFgen(nn.Module):
         self.softmax = nn.functional.softmax
         
         self.baseline = 0.
-        
+        self.entropy = Variable(torch.FloatTensor([0]))
+
         self.pqt_programs = np.array([])
         self.pqt_rewards = np.array([])
 
@@ -106,28 +107,7 @@ class BFgen(nn.Module):
         self.pqt_rewards = self.pqt_rewards[args][-10:] # K
 
 
-def evaluate(model, predict_len=100, variance=0.01):
-    input_token = 'S'
-    input_token = token_to_tensor(input_token)
-    model.init_hidden_normal(model.batch_size, variance=0.5)
-    prediction = [""] * model.batch_size
-    program_probs = np.ones((1, model.batch_size))
-    
-    batched_input = torch.zeros((model.batch_size, 1)).long()
-    batched_input = batched_input + input_token
-    batched_input = Variable(batched_input.view(1, model.batch_size))
-
-    for i in range(predict_len):
-        output_probs = model.forward(batched_input)
-        top_probs, next_tokens = torch.max(output_probs, 0)
-            
-        batched_input = next_tokens
-        next_tokens = next_tokens.view(model.batch_size)
-
-        program_probs *= top_probs.data.numpy()
-        
-        #prediction = map("".join,zip(prediction, char[]))
-        for i in xrange(model.batch_size):
-            prediction[i] += char[next_tokens[i].data[0]]
-        
-    return prediction, program_probs
+    def evaluate(self, batched_input):
+        output_probs = self.forward(batched_input)
+        self.entropy += -(torch.sum(output_probs * torch.log(output_probs)))
+        return output_probs
