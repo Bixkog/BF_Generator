@@ -34,32 +34,31 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
     objective = Variable(torch.FloatTensor([1]))
     baseline = 0
     for i in range(0, N, model.batch_size):
-        input_token = "START"
+        input_token = 'S'
         input_token = rnn.token_to_tensor(input_token)
-        model.init_hidden_normal(variance=0.5)
+        model.init_hidden_normal(model.batch_size, variance=0.5)
         prediction = [""] * model.batch_size
         policy_probs = Variable(torch.zeros(model.batch_size).float())
 
-        batched_input = torch.zeros((model.batch_size, rnn.token_num)).long()
+        batched_input = torch.zeros((model.batch_size, 1)).long()
         batched_input = batched_input + input_token
-        batched_input = Variable(batched_input.view(rnn.token_num, model.batch_size))
+        batched_input = Variable(batched_input.view(1, model.batch_size))
 
         for i in range(predict_len):
             output_probs = model.forward(batched_input)
-            top_probs, next_tokens = torch.max(output_probs, 1)
-            next_tokens = next_tokens.data.numpy()
+            top_probs, next_tokens = torch.max(output_probs, 0)
             
-            batched_input = torch.zeros((model.batch_size, rnn.token_num)).long()
-            batched_input[np.arange(model.batch_size), next_tokens] = 1
-            batched_input = Variable(batched_input.view(rnn.token_num, model.batch_size))
-            
+
+            batched_input = next_tokens.view(1, model.batch_size)
+            next_tokens = next_tokens.view(model.batch_size)
+
             # accumulate objective
             torch.log(top_probs)
             policy_probs += top_probs
             
             # save chars
             for i in xrange(model.batch_size):
-                prediction[i] += rnn.char[next_tokens[i]]
+                prediction[i] += rnn.char[next_tokens[i].data[0]]
         
         # calculate rewards
         rewards = np.array(map(reward_f, prediction))
@@ -73,15 +72,18 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
         model.save_best(rewards, prediction)
         
         rewards = Variable(torch.FloatTensor(rewards))
-        objective += (rewards * policy_probs).sum()
+        objective = (rewards * policy_probs).sum()
     return objective / N
 
 def objective_PQT(model):
     objective = Variable(torch.FloatTensor([1]))
-    model.init_hidden_normal()
-    
-    inputs = np.vectorize(rnn.program_to_input)(model.pqt_programs)
-    inputs = torch.stack(np.vectorize(program_to_tensor)(inputs), dim=3)
-    inputs = Variable(inputs.view(9, 100, 10))
+    model.init_hidden_normal(model.pqt_programs.shape[0])
 
-    output_probs = model.forward(inputs)
+    inputs = np.vectorize(rnn.program_to_input)(model.pqt_programs)
+    inputs = torch.stack(np.vectorize(rnn.program_to_tensor)(inputs), dim=1)
+    inputs = Variable(inputs) # 100 x 10
+
+    # forward without softmax
+    probs = model.forward(inputs) # 8 x 100 x 10
+    
+    return probs
