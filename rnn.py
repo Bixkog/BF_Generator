@@ -2,10 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-import numpy as np
-import torch
-import torch.nn as nn
-from torch.autograd import Variable
 
 token = {
     '.' : 0, 
@@ -53,7 +49,11 @@ class BFgen(nn.Module):
                        output_size, 
                        n_layers=2, 
                        batch_size=1,
-                       GAMMA=0.99):
+                       GAMMA=0.99,
+                       PG_learning_rate=1e-5,       # .\(ER) from paper
+                       PQT_loss_multipiler=1.0,     # .\(TOPK) from paper
+                       entropy_regularizer=0.01     # .\(ENT) from paper
+                       ):
         super(BFgen, self).__init__()
         self.input_size = input_size
         self.embedding_dim = embedding_dim
@@ -62,6 +62,9 @@ class BFgen(nn.Module):
         self.n_layers = n_layers
         self.batch_size = batch_size
         self.GAMMA = GAMMA
+        self.PG_learning_rate = PG_learning_rate
+        self.PQT_loss_multipiler = PQT_loss_multipiler
+        self.entropy_regularizer = entropy_regularizer
         
         self.encoder = nn.Embedding(input_size, embedding_dim)
         self.lstm = nn.LSTM(embedding_dim, hidden_size, n_layers)
@@ -69,6 +72,7 @@ class BFgen(nn.Module):
         self.softmax = nn.functional.softmax
         
         self.baseline = 0.
+        self.entropy = 0.
         
         self.pqt_programs = np.array([])
         self.pqt_rewards = np.array([])
@@ -118,6 +122,8 @@ def evaluate(model, predict_len=100, variance=0.01):
 
     for i in range(predict_len):
         output_probs = model.forward(batched_input)
+
+        model.entropy = -(torch.sum(output_probs * torch.log(output_probs), 0))
         top_probs, next_tokens = torch.max(output_probs, 0)
             
         batched_input = next_tokens.view(1, model.batch_size)

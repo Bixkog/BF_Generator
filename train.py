@@ -53,8 +53,7 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
             next_tokens = next_tokens.view(model.batch_size)
 
             # accumulate objective
-            torch.log(top_probs)
-            policy_probs += top_probs
+            policy_probs +=  torch.log(top_probs)
             
             # save chars
             for i in xrange(model.batch_size):
@@ -67,7 +66,7 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
         # exponential moving avarage
         # move to model, calculate over avarage of baselines
         rewards = rewards - model.baseline
-        
+
         #save best for PQT
         model.save_best(rewards, prediction)
         
