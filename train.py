@@ -32,6 +32,7 @@ def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1)
 
 def objective_PG(model, reward_f, predict_len = 100, N = 1000):
     objective = Variable(torch.FloatTensor([1]))
+    entropy = Variable(torch.FloatTensor([0]))
     baseline = 0
     for i in range(0, N, model.batch_size):
         input_token = 'S'
@@ -46,10 +47,11 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
 
         for i in range(predict_len):
             output_probs = model.forward(batched_input)
+            entropy += -(torch.sum(output_probs * torch.log(output_probs)))
+
             top_probs, next_tokens = torch.max(output_probs, 0)
             
-
-            batched_input = next_tokens.view(1, model.batch_size)
+            batched_input = next_tokens
             next_tokens = next_tokens.view(model.batch_size)
 
             # accumulate objective
@@ -72,7 +74,7 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
         
         rewards = Variable(torch.FloatTensor(rewards))
         objective = (rewards * policy_probs).sum()
-    return objective / N
+    return objective / N, entropy / N
 
 def objective_PQT(model):
     objective = Variable(torch.FloatTensor([1]))
@@ -82,7 +84,7 @@ def objective_PQT(model):
     inputs = torch.stack(np.vectorize(rnn.program_to_tensor)(inputs), dim=1)
     inputs = Variable(inputs) # 100 x 10
 
-    # forward without softmax
     probs = model.forward(inputs) # 8 x 100 x 10
+
     
     return probs
