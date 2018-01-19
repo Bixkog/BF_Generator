@@ -78,7 +78,7 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
 
 def objective_PQT(model):
     objective = Variable(torch.FloatTensor([1]))
-    model.init_hidden_normal(model.pqt_programs.shape[0])
+    model.init_hidden_normal(model.K)
 
     inputs = np.vectorize(rnn.program_to_input)(model.pqt_programs)
     inputs = torch.stack(np.vectorize(rnn.program_to_tensor)(inputs), dim=1)
@@ -90,6 +90,6 @@ def objective_PQT(model):
     probs = probs.permute(2, 1, 0) # 10 x 100 x 8
     probs = torch.gather(probs, 2, outputs.unsqueeze(2)).squeeze(2)
 
-    objective = torch.log(probs.prod(dim=1) + 0.00000001).sum()
+    objective = probs.log().sum()
 
-    return objective
+    return objective / model.K
