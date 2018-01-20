@@ -32,25 +32,22 @@ def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1)
 
 def objective_PG(model, reward_f, predict_len = 100, N = 1000):
     objective = Variable(torch.FloatTensor([1]))
-    entropy = Variable(torch.FloatTensor([0]))
     baseline = 0
     for i in range(0, N, model.batch_size):
         input_token = 'S'
         input_token = rnn.token_to_tensor(input_token)
         model.init_hidden_normal(model.batch_size, variance=0.5)
         prediction = [""] * model.batch_size
-        policy_probs = Variable(torch.zeros(model.batch_size).float())
+        policy_probs = Variable(torch.zeros(1, model.batch_size).float())
 
         batched_input = torch.zeros((model.batch_size, 1)).long()
         batched_input = batched_input + input_token
         batched_input = Variable(batched_input.view(1, model.batch_size))
 
         for i in range(predict_len):
-            output_probs = model.forward(batched_input)
-            entropy += -(torch.sum(output_probs * torch.log(output_probs)))
-
-            top_probs, next_tokens = torch.max(output_probs, 0)
+            output_probs = model.evaluate(batched_input)
             
+            top_probs, next_tokens = torch.max(output_probs, 0)
             batched_input = next_tokens
             next_tokens = next_tokens.view(model.batch_size)
 
@@ -74,7 +71,7 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
         
         rewards = Variable(torch.FloatTensor(rewards))
         objective = (rewards * policy_probs).sum()
-    return objective / N, entropy / N
+    return objective / N,
 
 def objective_PQT(model):
     objective = Variable(torch.FloatTensor([1]))
