@@ -80,6 +80,24 @@ class BFgen(nn.Module):
         self.pqt_rewards = np.array([])
 
     """
+    initialize weights and biases of the network
+    """
+    def init_weights(self, range_=0.1, factor=0.5, bias=1.0):
+        # encoder + decoder
+        self.encoder.weight.data.uniform_(-range_, range_)
+        self.decoder.bias.data.fill_(0)
+        self.decoder.weight.data.uniform_(-range_, range_)
+        # lstm
+        for name, param in self.lstm.named_parameters():
+            if 'bias' in name:
+                nn.init.constant(param, bias) 
+            else :
+                nn.init.kaiming_normal(param, factor)               
+        
+        
+
+
+    """
     forward
     Takes input_token and hidden memory state <- input to recursive layer
     returns output token and changed hidden memory state.
@@ -115,7 +133,6 @@ class BFgen(nn.Module):
 
     def evaluate(self, batched_input):
         output_probs = self.forward(batched_input)
-        self.entropy.detach_()
         self.entropy += -(torch.sum(output_probs * torch.log(output_probs)))
         return output_probs
 

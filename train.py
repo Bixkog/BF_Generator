@@ -19,7 +19,7 @@ def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1)
         return hamming_distance(program_output, expected_output) + B * b_scalar
     
     def S(program_output, expected_output):
-        return d([], expected_output) - d(program_output, expected_output)
+        return  d([], expected_output) - d(program_output, expected_output)
     
     def total_reward(program_code):
         program_outputs = map((lambda x: bfCompiler.BF(program_code, x)), bf_inputs)
@@ -33,6 +33,7 @@ def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1)
 def objective_PG(model, reward_f, predict_len = 100, N = 1000):
     objective = Variable(torch.FloatTensor([1]))
     baseline = 0
+    model.entropy = Variable(torch.FloatTensor([0])) # move to function
     for i in range(0, N, model.batch_size):
         input_token = 'S'
         input_token = rnn.token_to_tensor(input_token)
@@ -110,6 +111,10 @@ def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, epoch_size=1000, clip_
                     model.PQT_loss_multiplier * PQT_objective + \
                     model.entropy_regularizer * entropy
 
+        print(PG_objective)
+        print(PQT_objective)
+        print(entropy)
+        print(model.baseline)
         objective.backward()
         torch.nn.utils.clip_grad_norm(model.parameters(), clip_grad_norm)
         optimizer.step()
