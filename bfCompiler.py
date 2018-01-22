@@ -35,6 +35,8 @@ def buildbracemap(code):
 
 def bfEvaluate(code, input_list, bracemap, ops_limit, max_ops):
     output = ''
+    input_list += '0'
+    input_len = len(input_list) - 1
     code_ptr = cell_ptr = input_ptr = 0
 
     cells_num = 3000
@@ -70,7 +72,7 @@ def bfEvaluate(code, input_list, bracemap, ops_limit, max_ops):
             output += chr(cells[cell_ptr])
         if command == ",":
             cells[cell_ptr] = ord(input_list[input_ptr])
-            input_ptr += 1
+            input_ptr += (input_ptr < input_len)
 
         code_ptr += 1
 

@@ -50,8 +50,9 @@ class BFgen(nn.Module):
                        n_layers=2, 
                        batch_size=1,
                        GAMMA=0.99,
-                       PG_learning_rate=1e-5,       # .\(ER) from paper
-                       PQT_loss_multipiler=1.0,     # .\(TOPK) from paper
+                       # parameters for PQT + PG
+                       learning_rate=1e-4,       # .\(ER) from paper
+                       PQT_loss_multiplier=50.0,     # .\(TOPK) from paper
                        entropy_regularizer=0.01,     # .\(ENT) from paper
                        K = 10):
         super(BFgen, self).__init__()
@@ -62,8 +63,8 @@ class BFgen(nn.Module):
         self.n_layers = n_layers
         self.batch_size = batch_size
         self.GAMMA = GAMMA
-        self.PG_learning_rate = PG_learning_rate
-        self.PQT_loss_multipiler = PQT_loss_multipiler
+        self.learning_rate = learning_rate
+        self.PQT_loss_multiplier = PQT_loss_multiplier
         self.entropy_regularizer = entropy_regularizer
         self.K = 10
         
@@ -95,10 +96,14 @@ class BFgen(nn.Module):
         self.hidden = (Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size)),
                       Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size)),)
     
-    def init_hidden_normal(self, batch_size,variance=0.01):
-        means = torch.zeros(self.n_layers, batch_size, self.hidden_size)
-        std = torch.Tensor([variance]*self.hidden_size*self.n_layers*batch_size).unsqueeze(0)
-        self.hidden = (Variable(torch.normal(means, std)), Variable(torch.normal(means, std)))
+    def init_hidden_normal(self, batch_size, factor=0.5):
+        self.hidden = (Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size)),
+                      Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size))) 
+        nn.init.kaiming_normal(self.hidden[0], factor)
+        nn.init.kaiming_normal(self.hidden[1], factor)
+        # means = torch.zeros(self.n_layers, batch_size, self.hidden_size)
+        # std = torch.Tensor([variance]*self.hidden_size*self.n_layers*batch_size).unsqueeze(0)
+        # self.hidden = (Variable(torch.normal(means, std)), Variable(torch.normal(means, std)))
 
     def save_best(self, rewards, programs):
         self.pqt_programs = np.append(self.pqt_programs, programs)
@@ -110,5 +115,25 @@ class BFgen(nn.Module):
 
     def evaluate(self, batched_input):
         output_probs = self.forward(batched_input)
+        self.entropy.detach_()
         self.entropy += -(torch.sum(output_probs * torch.log(output_probs)))
         return output_probs
+
+    # generate 1 program
+    def sample(self, predict_len=100):
+        input_token = 'S'
+        input_token = token_to_tensor(input_token).view(1, 1)
+        input_token = Variable(input_token)
+
+        self.init_hidden_normal(1, factor=0.5)
+        prediction = ""
+
+        for i in range(predict_len):
+            output_probs = self.forward(input_token)
+            
+            top_probs, input_token = torch.max(output_probs, 0)
+
+            prediction += char[input_token.data[0][0]]
+
+        return prediction
+

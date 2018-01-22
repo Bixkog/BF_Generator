@@ -36,7 +36,7 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
     for i in range(0, N, model.batch_size):
         input_token = 'S'
         input_token = rnn.token_to_tensor(input_token)
-        model.init_hidden_normal(model.batch_size, variance=0.5)
+        model.init_hidden_normal(model.batch_size, factor=0.5)
         prediction = [""] * model.batch_size
         policy_probs = Variable(torch.zeros(1, model.batch_size).float())
 
@@ -59,7 +59,7 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
                 prediction[i] += rnn.char[next_tokens[i].data[0]]
         
         # calculate rewards
-        rewards = np.array(map(reward_f, prediction))
+        rewards = reward_f(prediction)
         rewards_mean = rewards.mean()
         model.baseline = rewards_mean * model.GAMMA + (1 - model.GAMMA) * model.baseline
         # exponential moving avarage
@@ -67,11 +67,11 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
         rewards = rewards - model.baseline
 
         #save best for PQT
-        model.save_best(rewards, prediction)
+        model.save_best(rewards, np.array(prediction))
         
         rewards = Variable(torch.FloatTensor(rewards))
         objective = (rewards * policy_probs).sum()
-    return objective / N,
+    return objective / N
 
 def objective_PQT(model):
     objective = Variable(torch.FloatTensor([1]))
@@ -90,3 +90,37 @@ def objective_PQT(model):
     objective = probs.log().sum()
 
     return objective / model.K
+
+# PQT + PG
+def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, epoch_size=1000, clip_grad_norm=50.0):
+    epoch_num = NPE / epoch_size
+    objectives = []
+    baselines = []
+    optimizer = torch.optim.RMSprop(model.parameters(), lr=model.learning_rate)
+    
+    print 'Epoch Obj  Sample'
+    print '----- ----- ------'
+    
+    for i in xrange(epoch_num):
+        model.zero_grad()
+        PG_objective = objective_PG(model, reward_f, seq_len, epoch_size)
+        PQT_objective = objective_PQT(model)
+        entropy = model.entropy
+        objective = PG_objective + \
+                    model.PQT_loss_multiplier * PQT_objective + \
+                    model.entropy_regularizer * entropy
+
+        objective.backward()
+        torch.nn.utils.clip_grad_norm(model.parameters(), clip_grad_norm)
+        optimizer.step()
+        
+        objectives.append((i, objective.data[0]))
+        baselines.append((i, model.baseline.data[0]))
+        
+        
+        
+        print '{: >4}  {: >5.3f} {}'.format(
+            i, objective.data[0], model.sample().encode('utf-8'))
+    
+        
+        
