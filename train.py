@@ -23,10 +23,13 @@ def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1)
     
     def total_reward(program_code):
         program_outputs = map((lambda x: bfCompiler.BF(program_code, x)), bf_inputs)
+        program_outputs = map(lambda(x,y,z):x, program_outputs)
         return scaling_factor * sum(S(program_output, bf_output) for program_output, bf_output in zip(program_outputs, bf_outputs))
     
     def reward_program(program_code_batch) :
-        return np.array(map(lambda x: total_reward(x), program_code_batch))
+        rewards = np.array(map(lambda x: total_reward(x), program_code_batch))
+        max_abs_reward = np.max(np.abs(rewards))
+        return rewards / max_abs_reward
         
     return reward_program
 
