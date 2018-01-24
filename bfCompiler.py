@@ -15,7 +15,7 @@ def parse(code):
                 unmatched_braces += 1
                 code = code[:position] + "N" + code[position + 1:]
     unmatched_braces += len(open_braces_pos)
-    for i in xrange(len(open_braces_pos)):
+    for i, position in enumerate(open_braces_pos):
         code = code[:(position - i)] + code[(position - i + 1):]
     code = code.replace("N", "")
     return code, unmatched_braces
