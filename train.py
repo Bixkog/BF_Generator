@@ -26,10 +26,11 @@ def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1)
         program_outputs = map(lambda(x,y,z):x, program_outputs)
         return scaling_factor * sum(S(program_output, bf_output) for program_output, bf_output in zip(program_outputs, bf_outputs))
     
-    def reward_program(program_code_batch) :
+    correct_reward = scaling_factor * sum(S(bf_output, bf_output) for bf_output in bf_outputs)
+    def reward_program(program_code_batch):
         rewards = np.array(map(lambda x: total_reward(x), program_code_batch))
-        max_abs_reward = np.max(np.abs(rewards))
-        return rewards / max_abs_reward
+        max_abs_reward = max(1e-8, correct_reward)
+        return np.vectorize(lambda x: max(-1, x))(rewards / max_abs_reward)
         
     return reward_program
 
@@ -81,12 +82,13 @@ def objective_PQT(model):
     objective = Variable(torch.FloatTensor([1]))
     model.init_hidden_normal(model.K)
 
-    inputs = np.vectorize(rnn.program_to_input)(model.pqt_programs)
-    inputs = torch.stack(np.vectorize(rnn.program_to_tensor)(inputs), dim=1)
+    inputs = np.vectorize(rnn.program_to_input)(model.pqt_programs) 
+    inputs = torch.stack(map(rnn.program_to_tensor, inputs), dim=1)
+    #inputs = torch.stack(np.vectorize(rnn.program_to_tensor)(inputs), dim=1)
     inputs = Variable(inputs) # 100 x 10
-    outputs = torch.stack(np.vectorize(rnn.program_to_tensor)(model.pqt_programs), dim=0)
+    outputs = torch.stack(map(rnn.program_to_tensor, model.pqt_programs), dim=0)
+    #outputs = torch.stack(np.vectorize(rnn.program_to_tensor)(model.pqt_programs), dim=0)
     outputs = Variable(outputs) # 10 x 100
-
     probs = model.forward(inputs) # 8 x 100 x 10
     probs = probs.permute(2, 1, 0) # 10 x 100 x 8
     probs = torch.gather(probs, 2, outputs.unsqueeze(2)).squeeze(2)
