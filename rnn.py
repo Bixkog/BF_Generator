@@ -71,7 +71,7 @@ class BFgen(nn.Module):
         self.encoder = nn.Embedding(input_size, embedding_dim)
         self.lstm = nn.LSTM(embedding_dim, hidden_size, n_layers)
         self.decoder = nn.Linear(hidden_size, output_size)
-        self.softmax = nn.functional.softmax
+        self.logsoftmax = nn.functional.log_softmax
         
         self.baseline = 0.
         self.entropy = Variable(torch.FloatTensor([0]))
@@ -107,7 +107,7 @@ class BFgen(nn.Module):
         embeds = self.encoder(input_token) # length x batch x token_size
         output, self.hidden = self.lstm(embeds, self.hidden) # length x batch x nhid
         decoded = self.decoder(output) # length x batch x output_size
-        probs = self.softmax(decoded.permute(2, 0, 1)) # output_size x length x batch
+        probs = self.logsoftmax(decoded.permute(2, 0, 1)) # output_size x length x batch
         return probs # output_size x length x batch
     
     def init_hidden_zero(self):
@@ -132,9 +132,9 @@ class BFgen(nn.Module):
 
 
     def evaluate(self, batched_input):
-        output_probs = self.forward(batched_input)
-        self.entropy += -(torch.sum(output_probs * torch.log(output_probs)))
-        return output_probs
+        output_log_probs = self.forward(batched_input)
+        self.entropy += -(torch.sum(output_log_probs * torch.exp(output_log_probs)))
+        return output_log_probs
 
     # generate 1 program
     def sample(self, predict_len=100):

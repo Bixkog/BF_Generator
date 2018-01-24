@@ -57,7 +57,7 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
             next_tokens = next_tokens.view(model.batch_size)
 
             # accumulate objective
-            policy_probs +=  torch.log(top_probs)
+            policy_probs +=  top_probs
             
             # save chars
             for i in xrange(model.batch_size):
@@ -93,7 +93,7 @@ def objective_PQT(model):
     probs = probs.permute(2, 1, 0) # 10 x 100 x 8
     probs = torch.gather(probs, 2, outputs.unsqueeze(2)).squeeze(2)
 
-    objective = probs.log().sum()
+    objective = probs.sum()
 
     return objective / model.K
 
