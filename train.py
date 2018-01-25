@@ -50,9 +50,10 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
         batched_input = Variable(batched_input.view(1, model.batch_size))
 
         for i in range(predict_len):
-            output_probs = model.evaluate(batched_input)
-            
-            top_probs, next_tokens = torch.max(output_probs, 0)
+            output_probs = model.evaluate(batched_input).view(model.batch_size, -1)
+            m = torch.distributions.Categorical(torch.exp(output_probs))
+            next_tokens = m.sample().view(1,-1)
+            top_probs = torch.stack([output_probs[i][next_tokens[0,i]] for i in xrange(model.batch_size)]).view(1, -1)
             batched_input = next_tokens
             next_tokens = next_tokens.view(model.batch_size)
 

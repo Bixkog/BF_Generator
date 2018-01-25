@@ -47,7 +47,7 @@ def bfEvaluate(code, input_list, bracemap, ops_limit, max_ops):
     while code_ptr < len(code):
         command = code[code_ptr]
         if ops_limit and operations_counter > max_ops:
-            return None, max_ops
+            return "", max_ops
         operations_counter += 1
         if command == ">":
             cell_ptr = cell_ptr + 1 if cell_ptr + 1 < cells_num else 0
@@ -79,7 +79,7 @@ def bfEvaluate(code, input_list, bracemap, ops_limit, max_ops):
     return output, operations_counter
 
 
-def BF(code, input_list='', ops_limit=False, max_ops=5000):
+def BF(code, input_list='', ops_limit=True, max_ops=5000):
     '''
         compiler of BF code
         Args:
