@@ -5,6 +5,7 @@ from torch.autograd import Variable
 
 import bfCompiler
 import rnn
+import brainfuck
 
 def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1) :
     outputs_num = len(bf_outputs)
@@ -22,8 +23,8 @@ def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1)
         return  d([], expected_output) - d(program_output, expected_output)
     
     def total_reward(program_code):
-        program_outputs = map((lambda x: bfCompiler.BF(program_code, x)), bf_inputs)
-        program_outputs = map(lambda (x,y,z):x, program_outputs)
+        program_outputs = map((lambda x: brainfuck.BF(program_code, x)), bf_inputs)
+        # program_outputs = map(lambda (x,y,z):x, program_outputs)
         return scaling_factor * sum(S(program_output, bf_output) for program_output, bf_output in zip(program_outputs, bf_outputs))
     
     correct_reward = scaling_factor * sum(S(bf_output, bf_output) for bf_output in bf_outputs)

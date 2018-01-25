@@ -52,7 +52,7 @@ struct instruction_t {
 
 static struct instruction_t PROGRAM[PROGRAM_SIZE];
 static unsigned int STACK[STACK_SIZE];
-static unsigned int DATA[DATA_SIZE];
+static char DATA[DATA_SIZE];
 static unsigned int SP = 0;
 
 #define STACK_PUSH(A)   (STACK[SP++] = A)
@@ -102,11 +102,11 @@ int execute_bf(const char* input, char* output) {
     unsigned int pc = 0;
     unsigned int ptr = 0;
     unsigned int instr_q = 0;
-    memset(DATA, 0, DATA_SIZE * sizeof(int));
+    memset(DATA, 0, DATA_SIZE);
     while (PROGRAM[pc].operator != OP_END && instr_q < MAX_INSTR) {
         switch (PROGRAM[pc].operator) {
             case OP_INC_DP: ptr++; break;
-            case OP_DEC_DP: ptr--; break;
+            case OP_DEC_DP:  if(ptr)ptr--; break;
             case OP_INC_VAL: DATA[ptr]++; break;
             case OP_DEC_VAL: DATA[ptr]--; break;
             case OP_OUT: *(output++) = (DATA[ptr]); break;
