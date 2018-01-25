@@ -6,12 +6,13 @@ from torch.autograd import Variable
 import bfCompiler
 import rnn
 
-def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1) :
+
+def batch_reward(bf_inputs, bf_outputs, B=256, scaling_factor=0.1):
     outputs_num = len(bf_outputs)
     def hamming_distance(seq1, seq2):
         assert len(seq1) == len(seq2)
         return sum(elem1 != elem2 for elem1, elem2 in zip(seq1, seq2))
-    
+
     def d(program_output, expected_output):
         b_scalar = abs(len(program_output) - len(expected_output))
         (program_output, expected_output) = (program_output, expected_output[:len(program_output)])\
@@ -23,18 +24,42 @@ def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1)
     
     def total_reward(program_code):
         program_outputs = map((lambda x: bfCompiler.BF(program_code, x)), bf_inputs)
-        program_outputs = map(lambda(x,y,z):x, program_outputs)
+        program_outputs = map(lambda(x,y,z): x, program_outputs)
         return scaling_factor * sum(S(program_output, bf_output) for program_output, bf_output in zip(program_outputs, bf_outputs))
     
     correct_reward = scaling_factor * sum(S(bf_output, bf_output) for bf_output in bf_outputs)
     def reward_program(program_code_batch):
         rewards = np.array(map(lambda x: total_reward(x), program_code_batch))
-        max_abs_reward = max(1e-8, correct_reward)
-        return np.vectorize(lambda x: max(-1, x))(rewards / max_abs_reward)
+        max_reward = max(1e-8, correct_reward)
+        return np.vectorize(lambda x: max(-1, x))(rewards / max_reward)
         
     return reward_program
 
-def objective_PG(model, reward_f, predict_len = 100, N = 1000):
+
+def simplified_batch_reward(expected_code, B=256, scaling_factor=0.1):
+    def hamming_distance(seq1, seq2):
+        assert len(seq1) == len(seq2)
+        return sum(elem1 != elem2 for elem1, elem2 in zip(seq1, seq2))
+
+    def d(generated_code, expected_code):
+        b_scalar = abs(len(generated_code) - len(expected_code))
+        (generated_code, expected_code) = (generated_code, expected_code[:len(generated_code)])\
+        if len(generated_code) <= len(expected_code) else (generated_code[:len(expected_code)], expected_code) 
+        return hamming_distance(generated_code, expected_code) + B * b_scalar
+
+    def S(generated_code, expected_code):
+        return  d([], expected_code) - d(generated_code, expected_code)
+
+    correct_reward = scaling_factor * S(expected_code, expected_code)
+    def reward_code(generated_code_batch):
+        rewards =  np.array(map(lambda x: scaling_factor * S(x, expected_code), generated_code_batch))
+        max_reward = max(1e-8, correct_reward)
+        return np.vectorize(lambda x: max(-1, x))(rewards / max_reward)
+
+    return reward_code
+
+
+def objective_PG(model, reward_f, predict_len=100, N=1000):
     objective = Variable(torch.FloatTensor([1]))
     baseline = 0
     model.entropy = Variable(torch.FloatTensor([0])) # move to function
