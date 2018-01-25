@@ -23,7 +23,7 @@ def batch_reward(bf_inputs, bf_outputs, batch_size, B = 256, scaling_factor=0.1)
     
     def total_reward(program_code):
         program_outputs = map((lambda x: bfCompiler.BF(program_code, x)), bf_inputs)
-        program_outputs = map(lambda(x,y,z):x, program_outputs)
+        program_outputs = map(lambda (x,y,z):x, program_outputs)
         return scaling_factor * sum(S(program_output, bf_output) for program_output, bf_output in zip(program_outputs, bf_outputs))
     
     correct_reward = scaling_factor * sum(S(bf_output, bf_output) for bf_output in bf_outputs)
@@ -53,7 +53,8 @@ def objective_PG(model, reward_f, predict_len = 100, N = 1000):
             output_probs = model.evaluate(batched_input).view(model.batch_size, -1)
             m = torch.distributions.Categorical(torch.exp(output_probs))
             next_tokens = m.sample().view(1,-1)
-            top_probs = torch.stack([output_probs[i][next_tokens[0,i]] for i in xrange(model.batch_size)]).view(1, -1)
+            top_probs = torch.stack([output_probs[i][next_tokens[0,i]] 
+                                    for i in xrange(model.batch_size)]).view(1, -1)
             batched_input = next_tokens
             next_tokens = next_tokens.view(model.batch_size)
 
@@ -131,7 +132,7 @@ def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, epoch_size=1000, clip_
         
         
         print '{: >4}  {: >5.3f} {}'.format(
-            i, objective.data[0], model.sample().encode('utf-8'))
+            i, objective.data[0], model.pqt_programs[0].encode('utf-8'))
     
         
         
