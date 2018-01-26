@@ -75,6 +75,7 @@ int compile_bf(const char* code) {
             case ',': PROGRAM[pc].operator = OP_IN; break;
             case '[':
                 PROGRAM[pc].operator = OP_JMP_FWD;
+                PROGRAM[pc].operand = pc;
                 STACK_PUSH(pc);
                 break;
             case ']':
@@ -121,21 +122,16 @@ int execute_bf(const char* input, char* output) {
     }
     *output = '\0';
     if(instr_q == MAX_INSTR)
-        *out_begin = '\0';
+        strcpy(out_begin, "INFINFINFINFINFINFINFINFINFINFINFINFINFINFINFINF\0"); // probably wrong output for all cases
     return SUCCESS;
 }
 
-char* compute_bf(const char* code, const char* input)
+char* compute_bf(const char* code, const char* input, char* output)
 {
     if(compile_bf(code))
         printf("compilation error");
-    char* output_buffor = (char*)malloc(OUTPUT_SIZE);
-    if(execute_bf(input, output_buffor))
+    if(execute_bf(input, output))
         printf("runtime error");
-    return output_buffor;
+    return output;
 }
 
-void free_out(void* output)
-{
-    free(output);
-}

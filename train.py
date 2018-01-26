@@ -74,8 +74,8 @@ def objective_PG(model, reward_f, predict_len=100):
 
     for i in range(predict_len):
         output_logits = model.evaluate(batched_input).view(model.batch_size, -1)
-        m = torch.distributions.Categorical(torch.exp(output_logits))
-        next_tokens = m.sample().unsqueeze(1)
+
+        next_tokens = torch.multinomial(torch.exp(output_logits), 1, True)
         picked_logits = torch.gather(output_logits, 1, next_tokens)
 
         batched_input = next_tokens.view(1, -1)
@@ -90,14 +90,14 @@ def objective_PG(model, reward_f, predict_len=100):
     
     # calculate rewards
     rewards = reward_f(prediction)
+    #save best for PQT
+    model.save_best(rewards, np.array(prediction))
+    
     rewards_mean = rewards.mean()
     model.baseline = rewards_mean * model.GAMMA + (1 - model.GAMMA) * model.baseline
     # exponential moving avarage
     # move to model, calculate over avarage of baselines
     rewards = rewards - model.baseline
-
-    #save best for PQT
-    model.save_best(rewards, np.array(prediction))
     
     rewards = Variable(torch.FloatTensor(rewards))
     objective = (rewards * policy_logits).sum()
@@ -150,7 +150,7 @@ def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, clip_grad_norm=50.0):
         baselines.append((i, model.baseline.data[0]))
         
         
-        if i % 100 == 0:
+        if i % 1000 == 0:
             print(PG_objective)
             print(PQT_objective)
             print(entropy)
