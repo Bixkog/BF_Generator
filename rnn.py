@@ -107,12 +107,12 @@ class BFgen(nn.Module):
         embeds = self.encoder(input_token) # length x batch x token_size
         output, self.hidden = self.lstm(embeds, self.hidden) # length x batch x nhid
         decoded = self.decoder(output) # length x batch x output_size
-        probs = self.logsoftmax(decoded.permute(2, 0, 1)) # output_size x length x batch
+        probs = self.logsoftmax(decoded.permute(2, 0, 1), dim=0) # output_size x length x batch
         return probs # output_size x length x batch
     
-    def init_hidden_zero(self):
-        self.hidden = (Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size)),
-                      Variable(torch.zeros(self.n_layers, self.batch_size, self.hidden_size)),)
+    def init_hidden_zero(self, batch_size):
+        self.hidden = (Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size)),
+                      Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size)),)
     
     def init_hidden_normal(self, batch_size, factor=0.5):
         self.hidden = (Variable(torch.zeros(self.n_layers, batch_size, self.hidden_size)),
@@ -130,6 +130,9 @@ class BFgen(nn.Module):
         self.pqt_programs = self.pqt_programs[args][-self.K:]
         self.pqt_rewards = self.pqt_rewards[args][-self.K:] # K
 
+    def clear_pq(self):
+        self.pqt_programs = np.array([])
+        self.pqt_rewards = np.array([])
 
     def evaluate(self, batched_input):
         output_log_probs = self.forward(batched_input)
@@ -147,6 +150,7 @@ class BFgen(nn.Module):
 
         for i in range(predict_len):
             output_probs = self.forward(input_token)
+
             
             top_probs, input_token = torch.max(output_probs, 0)
 

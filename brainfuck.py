@@ -15,5 +15,3 @@ def BF(code, input):
 	output = ctypes.cast(c_output, ctypes.c_char_p).value # save before free
 	bf.free_out(c_output) # free C memory
 	return output
-
-print BF(",>++++++[<-------->-],[<+>-]<.", "11")

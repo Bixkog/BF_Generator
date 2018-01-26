@@ -99,6 +99,7 @@ int compile_bf(const char* code) {
 }
 
 int execute_bf(const char* input, char* output) {
+    char* out_begin = output;
     unsigned int pc = 0;
     unsigned int ptr = 0;
     unsigned int instr_q = 0;
@@ -119,6 +120,8 @@ int execute_bf(const char* input, char* output) {
         instr_q++;
     }
     *output = '\0';
+    if(instr_q == MAX_INSTR)
+        *out_begin = '\0';
     return SUCCESS;
 }
 
