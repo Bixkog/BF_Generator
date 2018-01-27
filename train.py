@@ -137,7 +137,7 @@ def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, clip_grad_norm=50.0):
         model.zero_grad()
         PG_objective = objective_PG(model, reward_f, seq_len)
         PQT_objective = objective_PQT(model)
-        entropy = model.entropy
+        entropy = model.entropy / model.batch_size
         objective = PG_objective + \
                     model.PQT_loss_multiplier * PQT_objective + \
                     model.entropy_regularizer * entropy
