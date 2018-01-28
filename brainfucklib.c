@@ -45,15 +45,10 @@
 
 #define MAX_INSTR 500
 
-struct instruction_t {
+typedef struct {
     unsigned int operator;
     unsigned int operand;
-};
-
-static struct instruction_t PROGRAM[PROGRAM_SIZE];
-static unsigned int STACK[STACK_SIZE];
-static char DATA[DATA_SIZE];
-static unsigned int SP = 0;
+} instruction_t;
 
 #define STACK_PUSH(A)   (STACK[SP++] = A)
 #define STACK_POP()     (STACK[--SP])
@@ -61,32 +56,33 @@ static unsigned int SP = 0;
 #define STACK_CLEAN()   (SP = 0)
 #define STACK_FULL()    (SP == STACK_SIZE)
 
-int compile_bf(const char* code) {
+int compile_bf(instruction_t* program, const char* code) {
     unsigned int pc = 0, jmp_pc;
     char c;
-    STACK_CLEAN();
+    unsigned int STACK[STACK_SIZE];
+    unsigned int SP = 0;
     while ((c = code[pc]) != '\0') {
         switch (c) {
-            case '>': PROGRAM[pc].operator = OP_INC_DP; break;
-            case '<': PROGRAM[pc].operator = OP_DEC_DP; break;
-            case '+': PROGRAM[pc].operator = OP_INC_VAL; break;
-            case '-': PROGRAM[pc].operator = OP_DEC_VAL; break;
-            case '.': PROGRAM[pc].operator = OP_OUT; break;
-            case ',': PROGRAM[pc].operator = OP_IN; break;
+            case '>': program[pc].operator = OP_INC_DP; break;
+            case '<': program[pc].operator = OP_DEC_DP; break;
+            case '+': program[pc].operator = OP_INC_VAL; break;
+            case '-': program[pc].operator = OP_DEC_VAL; break;
+            case '.': program[pc].operator = OP_OUT; break;
+            case ',': program[pc].operator = OP_IN; break;
             case '[':
-                PROGRAM[pc].operator = OP_JMP_FWD;
-                PROGRAM[pc].operand = pc;
+                program[pc].operator = OP_JMP_FWD;
+                program[pc].operand = pc;
                 STACK_PUSH(pc);
                 break;
             case ']':
-                PROGRAM[pc].operator = OP_JMP_BCK;
+                program[pc].operator = OP_JMP_BCK;
                 if (STACK_EMPTY()) { // jump 1 instr forward
-                    PROGRAM[pc].operand = pc;
+                    program[pc].operand = pc;
                     break;
                 }
                 jmp_pc = STACK_POP();
-                PROGRAM[pc].operand = jmp_pc;
-                PROGRAM[jmp_pc].operand = pc;
+                program[pc].operand = jmp_pc;
+                program[jmp_pc].operand = pc;
                 break;
             default: return FAILURE; break;
         }
@@ -95,26 +91,27 @@ int compile_bf(const char* code) {
     if (pc >= PROGRAM_SIZE) {
         return FAILURE;
     }
-    PROGRAM[pc].operator = OP_END;
+    program[pc].operator = OP_END;
     return SUCCESS;
 }
 
-int execute_bf(const char* input, char* output) {
+int execute_bf(instruction_t* program, const char* input, char* output) {
     char* out_begin = output;
     unsigned int pc = 0;
     unsigned int ptr = 0;
     unsigned int instr_q = 0;
-    memset(DATA, 0, DATA_SIZE);
-    while (PROGRAM[pc].operator != OP_END && instr_q < MAX_INSTR) {
-        switch (PROGRAM[pc].operator) {
+    char data[DATA_SIZE];
+    memset(data, 0, DATA_SIZE);
+    while (program[pc].operator != OP_END && instr_q < MAX_INSTR) {
+        switch (program[pc].operator) {
             case OP_INC_DP: ptr++; break;
             case OP_DEC_DP:  if(ptr)ptr--; break;
-            case OP_INC_VAL: DATA[ptr]++; break;
-            case OP_DEC_VAL: DATA[ptr]--; break;
-            case OP_OUT: *(output++) = (DATA[ptr]); break;
-            case OP_IN: DATA[ptr] = (unsigned int)(*(input++)); break;
-            case OP_JMP_FWD: if(!DATA[ptr]) { pc = PROGRAM[pc].operand; } break;
-            case OP_JMP_BCK: if(DATA[ptr]) { pc = PROGRAM[pc].operand; } break;
+            case OP_INC_VAL: data[ptr]++; break;
+            case OP_DEC_VAL: data[ptr]--; break;
+            case OP_OUT: *(output++) = (data[ptr]); break;
+            case OP_IN: data[ptr] = (unsigned int)(*(input++)); break;
+            case OP_JMP_FWD: if(!data[ptr]) { pc = program[pc].operand; } break;
+            case OP_JMP_BCK: if(data[ptr]) { pc = program[pc].operand; } break;
             default: return FAILURE;
         }
         pc++;
@@ -128,9 +125,11 @@ int execute_bf(const char* input, char* output) {
 
 char* compute_bf(const char* code, const char* input, char* output)
 {
-    if(compile_bf(code))
+    instruction_t program[PROGRAM_SIZE];
+    memset(output, 0, OUTPUT_SIZE);
+    if(compile_bf(program, code))
         printf("compilation error");
-    if(execute_bf(input, output))
+    if(execute_bf(program, input, output))
         printf("runtime error");
     return output;
 }

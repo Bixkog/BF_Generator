@@ -92,7 +92,7 @@ def objective_PG(model, reward_f, predict_len=100):
     rewards = reward_f(prediction)
     #save best for PQT
     model.save_best(rewards, np.array(prediction))
-    
+
     rewards_mean = rewards.mean()
     model.baseline = rewards_mean * model.GAMMA + (1 - model.GAMMA) * model.baseline
     # exponential moving avarage
@@ -137,7 +137,7 @@ def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, clip_grad_norm=50.0):
         model.zero_grad()
         PG_objective = objective_PG(model, reward_f, seq_len)
         PQT_objective = objective_PQT(model)
-        entropy = model.entropy
+        entropy = model.entropy / model.batch_size
         objective = PG_objective + \
                     model.PQT_loss_multiplier * PQT_objective + \
                     model.entropy_regularizer * entropy
@@ -159,4 +159,57 @@ def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, clip_grad_norm=50.0):
             print '{: >4}  {: >5.3f} {}'.format(
                 i, objective.data[0], model.pqt_programs[0].encode('utf-8'))
 
+import torch.multiprocessing as mp
+
+
+def train_worker(model, reward_f, seq_len):
+    PG_objective = objective_PG(model, reward_f, seq_len)
+    PQT_objective = objective_PQT(model)
+    entropy = model.entropy / model.batch_size
+    objective = PG_objective + \
+                model.PQT_loss_multiplier * PQT_objective + \
+                model.entropy_regularizer * entropy
+    (-objective).backward()
+    torch.nn.utils.clip_grad_norm(model.parameters(), clip_grad_norm)
+    optimizer.step()
+
+#PQT + PG parallel
+def train_pqt_pg_parallel(pq = 12,model, reward_f, NPE=20000, seq_len=100, clip_grad_norm=50.0):
+    epoch_num = NPE / model.batch_size
+    objectives = []
+    baselines = []
+    optimizer = torch.optim.RMSprop(model.parameters(), lr=model.learning_rate)
+    
+    print 'Epoch Obj  Sample'
+    print '----- ----- ------'
+
+    for i in xrange(epoch_num):
+        q = mp.Queue()
+        model.zero_grad()
+        model.share_memory()
+        processes = []
+        for j in range(pq):
+            p = mp.Process(target=get_objective, args=(q, model, reward_f, seq_len))
+            p.start()
+            processes.append(p)
+
+
+
+
+        (-objective).backward()
+        torch.nn.utils.clip_grad_norm(model.parameters(), clip_grad_norm)
+        optimizer.step()
+        
+        objectives.append((i, objective.data[0]))
+        baselines.append((i, model.baseline.data[0]))
+        
+        
+        if i % 1000 == 0:
+            print(PG_objective)
+            print(PQT_objective)
+            print(entropy)
+            print(model.baseline)
+            print "pqt", zip(model.pqt_programs, model.pqt_rewards)    
+            print '{: >4}  {: >5.3f} {}'.format(
+                i, objective.data[0], model.pqt_programs[0].encode('utf-8'))
 
