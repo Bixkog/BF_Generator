@@ -7,6 +7,7 @@ import bfCompiler
 import rnn
 import brainfuck
 
+import matplotlib.pyplot as plt
 
 def batch_reward(bf_inputs, bf_outputs, B=256, scaling_factor=0.1):
     def hamming_distance(seq1, seq2):
@@ -124,10 +125,11 @@ def objective_PQT(model):
     return objective / model.K
 
 # PQT + PG
-def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, clip_grad_norm=50.0):
+def train_pqt_pg(model, reward_f, exp_code='',NPE=20000, seq_len=100, clip_grad_norm=50.0):
     epoch_num = NPE / model.batch_size
     objectives = []
     baselines = []
+    opt_probs = []
     optimizer = torch.optim.RMSprop(model.parameters(), lr=model.learning_rate)
     
     print 'Epoch Obj  Sample'
@@ -147,8 +149,8 @@ def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, clip_grad_norm=50.0):
         optimizer.step()
         
         objectives.append((i, objective.data[0]))
-        baselines.append((i, model.baseline.data[0]))
-        
+        baselines.append((i, model.baseline))
+        opt_probs.append((i, model.get_probs(exp_code).data[0]))
         
         if i % 1000 == 0:
             print(PG_objective)
@@ -158,6 +160,17 @@ def train_pqt_pg(model, reward_f, NPE=20000, seq_len=100, clip_grad_norm=50.0):
             print "pqt", zip(model.pqt_programs, model.pqt_rewards)    
             print '{: >4}  {: >5.3f} {}'.format(
                 i, objective.data[0], model.pqt_programs[0].encode('utf-8'))
+            print(model.get_probs(exp_code))
+
+    fig, ax = plt.subplots(3, figsize=(15, 10))
+    labels = ["objective", "baseline", "opt_prob"]
+    for i, data in enumerate([objectives, baselines, opt_probs]):
+        data_a = np.array(data)
+        ax[i].plot(data_a[:,0], data_a[:,1], label=labels[i])
+        # semilogy(losses_a[:,0], losses_a[:,2], label='grad norm', alpha=0.5)
+        ax[i].legend(loc='lower left')
+    plt.show()
+
 
 import torch.multiprocessing as mp
 
@@ -174,7 +187,7 @@ def train_worker(model, reward_f, seq_len):
     optimizer.step()
 
 #PQT + PG parallel
-def train_pqt_pg_parallel(pq = 12,model, reward_f, NPE=20000, seq_len=100, clip_grad_norm=50.0):
+def train_pqt_pg_parallel(model, reward_f, pq=12, NPE=20000, seq_len=100, clip_grad_norm=50.0):
     epoch_num = NPE / model.batch_size
     objectives = []
     baselines = []
@@ -186,7 +199,7 @@ def train_pqt_pg_parallel(pq = 12,model, reward_f, NPE=20000, seq_len=100, clip_
     for i in xrange(epoch_num):
         q = mp.Queue()
         model.zero_grad()
-        model.share_memory()
+        model.share_memory_()
         processes = []
         for j in range(pq):
             p = mp.Process(target=get_objective, args=(q, model, reward_f, seq_len))

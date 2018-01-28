@@ -3,10 +3,10 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
-# orthogonal init
-# correct prefix as reward
+# orthogonal init DONE
+# correct prefix as reward DONE
 # print correct output prob
-# lower entropy
+# lower entropy DONE
 
 token = {
     '.' : 0, 
@@ -58,7 +58,7 @@ class BFgen(nn.Module):
                        # parameters for PQT + PG
                        learning_rate=1e-4,       # .\(ER) from paper
                        PQT_loss_multiplier=50.0,     # .\(TOPK) from paper
-                       entropy_regularizer=0.01,     # .\(ENT) from paper
+                       entropy_regularizer=0.001,     # .\(ENT) from paper
                        K = 10):
         super(BFgen, self).__init__()
         self.input_size = input_size
@@ -97,7 +97,7 @@ class BFgen(nn.Module):
             if 'bias' in name:
                 nn.init.constant(param, bias) 
             else :
-                nn.init.kaiming_normal(param, factor)               
+                nn.init.orthogonal(param, factor)               
         
         
 
@@ -163,3 +163,20 @@ class BFgen(nn.Module):
 
         return prediction
 
+
+    def get_probs(self, sample):
+        input = program_to_input(np.array([sample]))
+        # print(input)
+        input = torch.stack(map(program_to_tensor, 
+                                input), dim=1)
+        input = Variable(input)
+        output = torch.stack(map(program_to_tensor, 
+                        [sample]), dim=0)
+        output = Variable(output)
+        self.init_hidden_zero(1)
+        probs = self.forward(input) # 8 x 100 x 1
+        probs = probs.permute(2, 1, 0) # 1 x 100 x 8
+        
+        probs = torch.gather(probs, 2, output.unsqueeze(2)).squeeze(2)
+
+        return probs.squeeze(0).exp().mean()
