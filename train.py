@@ -62,16 +62,16 @@ def simplified_batch_reward(expected_code, B=256, scaling_factor=0.1):
 
 def objective_PG(model, reward_f, predict_len=100):
     
-    model.entropy = Variable(torch.FloatTensor([0])) # move to function
+    model.entropy = rnn.V(torch.FloatTensor([0])) # move to function
     input_token = 'S'
     input_token = rnn.token_to_tensor(input_token)
     model.init_hidden_zero(model.batch_size)
     prediction = [""] * model.batch_size
-    policy_logits = Variable(torch.zeros(model.batch_size, 1).float())
+    policy_logits = rnn.V(torch.zeros(model.batch_size, 1).float())
 
     batched_input = torch.zeros((model.batch_size, 1)).long()
     batched_input = batched_input + input_token
-    batched_input = Variable(batched_input.view(1, model.batch_size))
+    batched_input = rnn.V(batched_input.view(1, model.batch_size))
 
     for i in range(predict_len):
         output_logits = model.evaluate(batched_input).view(model.batch_size, -1)
@@ -100,22 +100,22 @@ def objective_PG(model, reward_f, predict_len=100):
     # move to model, calculate over avarage of baselines
     rewards = rewards - model.baseline
     
-    rewards = Variable(torch.FloatTensor(rewards))
+    rewards = rnn.V(torch.FloatTensor(rewards))
     objective = (rewards * policy_logits).sum()
 
     return objective / model.batch_size
 
 def objective_PQT(model):
-    objective = Variable(torch.FloatTensor([1]))
+    objective = rnn.V(torch.FloatTensor([1]))
     model.init_hidden_zero(model.K)
 
     inputs = np.vectorize(rnn.program_to_input)(model.pqt_programs) 
     inputs = torch.stack(map(rnn.program_to_tensor, inputs), dim=1)
     #inputs = torch.stack(np.vectorize(rnn.program_to_tensor)(inputs), dim=1)
-    inputs = Variable(inputs) # 100 x 10
+    inputs = rnn.V(inputs) # 100 x 10
     outputs = torch.stack(map(rnn.program_to_tensor, model.pqt_programs), dim=0)
     #outputs = torch.stack(np.vectorize(rnn.program_to_tensor)(model.pqt_programs), dim=0)
-    outputs = Variable(outputs) # 10 x 100
+    outputs = rnn.V(outputs) # 10 x 100
     probs = model.forward(inputs) # 8 x 100 x 10
     probs = probs.permute(2, 1, 0) # 10 x 100 x 8
     probs = torch.gather(probs, 2, outputs.unsqueeze(2)).squeeze(2)
@@ -167,62 +167,5 @@ def train_pqt_pg(model, reward_f, exp_code='',NPE=20000, seq_len=100, clip_grad_
     for i, data in enumerate([objectives, baselines, opt_probs]):
         data_a = np.array(data)
         ax[i].plot(data_a[:,0], data_a[:,1], label=labels[i])
-        # semilogy(losses_a[:,0], losses_a[:,2], label='grad norm', alpha=0.5)
         ax[i].legend(loc='lower left')
     plt.show()
-
-
-import torch.multiprocessing as mp
-
-
-def train_worker(model, reward_f, seq_len):
-    PG_objective = objective_PG(model, reward_f, seq_len)
-    PQT_objective = objective_PQT(model)
-    entropy = model.entropy / model.batch_size
-    objective = PG_objective + \
-                model.PQT_loss_multiplier * PQT_objective + \
-                model.entropy_regularizer * entropy
-    (-objective).backward()
-    torch.nn.utils.clip_grad_norm(model.parameters(), clip_grad_norm)
-    optimizer.step()
-
-#PQT + PG parallel
-def train_pqt_pg_parallel(model, reward_f, pq=12, NPE=20000, seq_len=100, clip_grad_norm=50.0):
-    epoch_num = NPE / model.batch_size
-    objectives = []
-    baselines = []
-    optimizer = torch.optim.RMSprop(model.parameters(), lr=model.learning_rate)
-    
-    print 'Epoch Obj  Sample'
-    print '----- ----- ------'
-
-    for i in xrange(epoch_num):
-        q = mp.Queue()
-        model.zero_grad()
-        model.share_memory_()
-        processes = []
-        for j in range(pq):
-            p = mp.Process(target=get_objective, args=(q, model, reward_f, seq_len))
-            p.start()
-            processes.append(p)
-
-
-
-
-        (-objective).backward()
-        torch.nn.utils.clip_grad_norm(model.parameters(), clip_grad_norm)
-        optimizer.step()
-        
-        objectives.append((i, objective.data[0]))
-        baselines.append((i, model.baseline.data[0]))
-        
-        
-        if i % 1000 == 0:
-            print(PG_objective)
-            print(PQT_objective)
-            print(entropy)
-            print(model.baseline)
-            print "pqt", zip(model.pqt_programs, model.pqt_rewards)    
-            print '{: >4}  {: >5.3f} {}'.format(
-                i, objective.data[0], model.pqt_programs[0].encode('utf-8'))
-
