@@ -3,6 +3,11 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
+# orthogonal init
+# correct prefix as reward
+# print correct output prob
+# lower entropy
+
 token = {
     '.' : 0, 
     ',' : 1, 
