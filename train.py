@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 def batch_reward(bf_inputs, bf_outputs, B=256, scaling_factor=0.1):
     def hamming_distance(seq1, seq2):
         assert len(seq1) == len(seq2)
-        return sum(elem1 != elem2 for elem1, elem2 in zip(seq1, seq2))
+        return sum(abs(ord(elem1) - ord(elem2)) for elem1, elem2 in zip(seq1, seq2))
 
     def d(seq1, seq2):
         b_scalar = abs(len(seq1) - len(seq2))
@@ -74,8 +74,9 @@ def objective_PG(model, reward_f, predict_len=100):
     batched_input = rnn.V(batched_input.view(1, model.batch_size))
 
     for i in range(predict_len):
-        output_logits = model.evaluate(batched_input).view(model.batch_size, -1)
-
+        output_logits = model.evaluate(batched_input)
+        output_logits = output_logits.permute(2, 1, 0).squeeze(1)
+        
         next_tokens = torch.multinomial(torch.exp(output_logits), 1, True)
         picked_logits = torch.gather(output_logits, 1, next_tokens)
 
@@ -95,7 +96,7 @@ def objective_PG(model, reward_f, predict_len=100):
     model.save_best(rewards, np.array(prediction))
 
     rewards_mean = rewards.mean()
-    model.baseline = rewards_mean * model.GAMMA + (1 - model.GAMMA) * model.baseline
+    model.baseline = rewards_mean * (1 - model.GAMMA) + model.GAMMA * model.baseline
     # exponential moving avarage
     # move to model, calculate over avarage of baselines
     rewards = rewards - model.baseline
@@ -129,7 +130,6 @@ def train_pqt_pg(model, reward_f, exp_code='',NPE=20000, seq_len=100, clip_grad_
     epoch_num = NPE / model.batch_size
     objectives = []
     baselines = []
-    opt_probs = []
     optimizer = torch.optim.RMSprop(model.parameters(), lr=model.learning_rate)
     
     print 'Epoch Obj  Sample'
@@ -150,7 +150,6 @@ def train_pqt_pg(model, reward_f, exp_code='',NPE=20000, seq_len=100, clip_grad_
         
         objectives.append((i, objective.data[0]))
         baselines.append((i, model.baseline))
-        opt_probs.append((i, model.get_probs(exp_code).data[0]))
         
         if i % 1000 == 0:
             print(PG_objective)
@@ -160,11 +159,10 @@ def train_pqt_pg(model, reward_f, exp_code='',NPE=20000, seq_len=100, clip_grad_
             print "pqt", zip(model.pqt_programs, model.pqt_rewards)    
             print '{: >4}  {: >5.3f} {}'.format(
                 i, objective.data[0], model.pqt_programs[0].encode('utf-8'))
-            print(model.get_probs(exp_code))
 
-    fig, ax = plt.subplots(3, figsize=(15, 10))
-    labels = ["objective", "baseline", "opt_prob"]
-    for i, data in enumerate([objectives, baselines, opt_probs]):
+    fig, ax = plt.subplots(2, figsize=(15, 10))
+    labels = ["objective", "baseline"]
+    for i, data in enumerate([objectives, baselines]):
         data_a = np.array(data)
         ax[i].plot(data_a[:,0], data_a[:,1], label=labels[i])
         ax[i].legend(loc='lower left')

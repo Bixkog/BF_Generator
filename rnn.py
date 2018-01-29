@@ -48,10 +48,10 @@ def pred(sample):
 
 CUDA = False
 
-def V(x):
+def V(x, **kwargs):
     if CUDA:
         x.cuda()
-    return Variable(x)
+    return Variable(x, **kwargs)
 
 
 class BFgen(nn.Module):
@@ -63,9 +63,9 @@ class BFgen(nn.Module):
                        batch_size=1,
                        GAMMA=0.99,
                        # parameters for PQT + PG
-                       learning_rate=1e-3,       # .\(ER) from paper
+                       learning_rate=1e-4,       # .\(ER) from paper
                        PQT_loss_multiplier=50.0,     # .\(TOPK) from paper
-                       entropy_regularizer=0.001,     # .\(ENT) from paper
+                       entropy_regularizer=0.01,     # .\(ENT) from paper
                        K = 10):
         super(BFgen, self).__init__()
         self.input_size = input_size
@@ -91,8 +91,6 @@ class BFgen(nn.Module):
         self.pqt_programs = np.array([])
         self.pqt_rewards = np.array([])
 
-        if CUDA:
-            self.cuda()
 
     """
     initialize weights and biases of the network
@@ -189,4 +187,4 @@ class BFgen(nn.Module):
         
         probs = torch.gather(probs, 2, output.unsqueeze(2)).squeeze(2)
 
-        return probs.squeeze(0).exp().unsqueeze(1)
+        return probs.exp()
