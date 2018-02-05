@@ -93,6 +93,9 @@ class BFgen(nn.Module):
         self.pqt_programs = np.array([])
         self.pqt_rewards = np.array([])
 
+        if CUDA:
+            self.cuda()
+
 
     """
     initialize weights and biases of the network
