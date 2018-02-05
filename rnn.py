@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import cPickle as pickle
+import json
 
 # orthogonal init DONE
 # correct prefix as reward DONE
@@ -188,3 +190,16 @@ class BFgen(nn.Module):
         probs = torch.gather(probs, 2, output.unsqueeze(2)).squeeze(2)
 
         return probs.exp()
+
+    def save(self, file_name):
+        file_name = "./models/" + file_name
+        torch.save(self.state_dict(), file_name + "_p")
+        json.dump(list(self.pqt_rewards), open(file_name + "_pqtr.p", "wb"))
+        json.dump(list(self.pqt_programs), open(file_name + "_pqtp.p", "wb"))
+
+
+    def load(self, file_name):
+        file_name = "./models/" + file_name
+        self.load_state_dict(torch.load(file_name + "_p"))
+        self.pqt_rewards = np.array(json.load(open(file_name + "_pqtr.p", "rb")))
+        self.pqt_programs = np.array(json.load(open(file_name + "_pqtp.p", "rb")))

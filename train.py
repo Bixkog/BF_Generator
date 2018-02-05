@@ -8,6 +8,10 @@ import rnn
 import brainfuck
 
 import matplotlib.pyplot as plt
+from multiprocessing import Pool
+import time
+# generate tests
+
 
 def batch_reward(bf_inputs, bf_outputs, B=256, scaling_factor=0.1):
     def hamming_distance(seq1, seq2):
@@ -126,7 +130,13 @@ def objective_PQT(model):
     return objective / model.K
 
 # PQT + PG
-def train_pqt_pg(model, reward_f, exp_code='',NPE=20000, seq_len=100, clip_grad_norm=50.0):
+def train_pqt_pg(model, 
+        reward_f, 
+        exp_code='',
+        NPE=20000, 
+        seq_len=100, 
+        clip_grad_norm=50.0,
+        model_file = "model"):
     epoch_num = NPE / model.batch_size
     objectives = []
     baselines = []
@@ -136,6 +146,7 @@ def train_pqt_pg(model, reward_f, exp_code='',NPE=20000, seq_len=100, clip_grad_
     print '----- ----- ------'
     
     for i in xrange(epoch_num):
+        begin = time.clock()
         model.zero_grad()
         PG_objective = objective_PG(model, reward_f, seq_len)
         PQT_objective = objective_PQT(model)
@@ -156,9 +167,12 @@ def train_pqt_pg(model, reward_f, exp_code='',NPE=20000, seq_len=100, clip_grad_
             print(PQT_objective)
             print(entropy)
             print(model.baseline)
+            print(time.clock() - begin)
             print "pqt", zip(model.pqt_programs, model.pqt_rewards)    
             print '{: >4}  {: >5.3f} {}'.format(
                 i, objective.data[0], model.pqt_programs[0].encode('utf-8'))
+            if i % 10000 == 0:
+                model.save(model_file)
 
     fig, ax = plt.subplots(2, figsize=(15, 10))
     labels = ["objective", "baseline"]
@@ -167,3 +181,17 @@ def train_pqt_pg(model, reward_f, exp_code='',NPE=20000, seq_len=100, clip_grad_
         ax[i].plot(data_a[:,0], data_a[:,1], label=labels[i])
         ax[i].legend(loc='lower left')
     plt.show()
+
+import random
+
+def gen_string(length):
+    return "".join([chr(random.randint(1, 255)) for i in range(length)])
+
+def gen_tests(f, B=256, seed=123497027, quantity=1000):
+    random.seed(seed)
+    inputs = range(quantity)
+    inputs = [random.randint(1, 15) for i in inputs]
+    inputs = map(gen_string, inputs)
+    outputs = [f(s) for s in inputs]
+    scaling_factor = 1. / (B * sum(map(len, outputs)))
+    return inputs, outputs, scaling_factor

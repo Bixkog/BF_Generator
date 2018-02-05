@@ -10,7 +10,7 @@ output_buf = ctypes.create_string_buffer(1024)
 
 def BF(code, input):
 	c_code = ctypes.c_char_p(code)
-	c_input = ctypes.c_char_p(input)
+	c_input = ctypes.c_char_p(input.ljust(500, '\0'))
 	c_output = bf.compute_bf(c_code, c_input, output_buf)
 	output = ctypes.cast(c_output, ctypes.c_char_p).value # save before free
 	return output
