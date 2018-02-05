@@ -60,8 +60,13 @@ if __name__ == "__main__":
 	parser.add_argument("-p", "--parallel", 
 		help="use multiprocessing to interpret BF",
 		action="store_true")
+	parser.add_argument("-c", "--cuda", 
+		help="use cuda",
+		action="store_true")
 
 	args = parser.parse_args()
+
+	rnn.CUDA = args.cuda
 
 	embedding_size = 10
 	hidden_size = 35
