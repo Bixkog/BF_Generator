@@ -136,7 +136,7 @@ def train_pqt_pg(model,
         NPE=20000, 
         seq_len=100, 
         clip_grad_norm=50.0,
-        model_file = "model"):
+        file_name = "model"):
     epoch_num = NPE / model.batch_size
     objectives = []
     baselines = []
@@ -172,7 +172,7 @@ def train_pqt_pg(model,
             print '{: >4}  {: >5.3f} {}'.format(
                 i, objective.data[0], model.pqt_programs[0].encode('utf-8'))
             if i % 10000 == 0:
-                model.save(model_file)
+                model.save(file_name)
 
     fig, ax = plt.subplots(2, figsize=(15, 10))
     labels = ["objective", "baseline"]

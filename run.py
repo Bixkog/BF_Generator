@@ -56,6 +56,7 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-l", "--load", help="load model from models dir,\
 										base name needed")
+	parser.add_argument("-n", "--name", help="model name for saving")
 	parser.add_argument("-p", "--parallel", 
 		help="use multiprocessing to interpret BF",
 		action="store_true")
@@ -79,6 +80,9 @@ if __name__ == "__main__":
 		model.clear_pq()
 		model.init_weights()
 
+	if not args.name:
+		args.name = "model"
+
 	reverse_in, reverse_out, scaling_factor = train.gen_tests(reverse)
 	
 	if args.parallel:
@@ -91,4 +95,4 @@ if __name__ == "__main__":
 			scaling_factor=scaling_factor)
 
 	train.train_pqt_pg(model, 
-		reverse_reward, NPE=20000000)
+		reverse_reward, NPE=20000000, file_name=args.name)
