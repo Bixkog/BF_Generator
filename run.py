@@ -39,13 +39,13 @@ def reward_program(program_code_batch):
 
 def parallel_batch_reward(bf_inputs_, bf_outputs_, B_=256, scaling_factor_=0.1):
 	global bf_inputs
-	bf_inputs = multiprocessing.Array(ctypes.c_char_p, bf_inputs_)
+	bf_inputs = multiprocessing.Array(ctypes.c_char_p, bf_inputs_, lock=False)
 	global bf_outputs
-	bf_outputs = multiprocessing.Array(ctypes.c_char_p, bf_outputs_)
+	bf_outputs = multiprocessing.Array(ctypes.c_char_p, bf_outputs_, lock=False)
 	global B
-	B = multiprocessing.Value("i", B_)
+	B = multiprocessing.Value("i", B_, lock=False)
 	global scaling_factor
-	scaling_factor = multiprocessing.Value("f", scaling_factor_)
+	scaling_factor = multiprocessing.Value("f", scaling_factor_, lock=False)
 	global pool
 	pool = multiprocessing.Pool()
 	return reward_program
@@ -78,7 +78,8 @@ if __name__ == "__main__":
 	model = rnn.BFgen(rnn.token_num, 
 			embedding_size, hidden_size, 
 			output_size, n_layers, batch_size)
-
+	if args.cuda:
+		model.cuda()
 	if args.load:
 		model.load(args.load)
 	else:

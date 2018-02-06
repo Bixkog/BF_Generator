@@ -52,7 +52,7 @@ CUDA = False
 
 def V(x, **kwargs):
     if CUDA:
-        x.cuda()
+        x = x.cuda()
     return Variable(x, **kwargs)
 
 
